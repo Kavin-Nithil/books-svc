@@ -395,6 +395,19 @@ def root():
         },
     }
 
+import multiprocessing
+
+def run_app1():
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+
+def run_app2():
+    from artist_app import artist_app
+    uvicorn.run("artist_app:artist_app", host="0.0.0.0", port=8001, reload=True)
 
 if __name__ == "__main__":
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    p1 = multiprocessing.Process(target=run_app1)
+    p2 = multiprocessing.Process(target=run_app2)
+    p1.start()
+    p2.start()
+    p1.join()
+    p2.join()
