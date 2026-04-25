@@ -1,0 +1,787 @@
+{
+  "info": {
+    "name": "Kong Gateway - Rate Limit and Request Size Tests",
+    "_postman_id": "d01f58db-43ca-42d4-8af9-27d9c0e1f4c2",
+    "description": "Postman collection for testing the DB-less Kong gateway in front of `app.py` (port 8000) and `artist_app.py` (port 8001).\n\nRun the backend apps first:\n```\npython3 app.py\n```\nThen start Kong:\n```\ndocker compose up -d kong\n```\n\nPorts:\n- Kong proxy: `http://localhost:9000`\n- Kong Admin API: `http://localhost:9001`\n\nRequired assignment scenarios included explicitly:\n- 10 rapid requests (>5/s) -> `429 Too Many Requests`\n- POST with 2 MB body -> `413 Payload Too Large`\n- No Authorization header -> `401 Unauthorized`\n- Valid admin credentials -> `200 OK` with higher per-consumer quota",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "kong_proxy_url",
+      "value": "http://localhost:9000",
+      "type": "string"
+    },
+    {
+      "key": "kong_admin_url",
+      "value": "http://localhost:9001",
+      "type": "string"
+    },
+    {
+      "key": "artist_basic_user",
+      "value": "admin",
+      "type": "string"
+    },
+    {
+      "key": "artist_basic_pass",
+      "value": "secret123",
+      "type": "string"
+    },
+    {
+      "key": "artist_admin_apikey",
+      "value": "artist-admin-key",
+      "type": "string"
+    },
+    {
+      "key": "artist_readonly_apikey",
+      "value": "artist-readonly-key",
+      "type": "string"
+    },
+    {
+      "key": "book_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "artist_name",
+      "value": "Arctic Beats",
+      "type": "string"
+    },
+    {
+      "key": "huge_title",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "two_mb_blob",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Required Assignment Scenarios",
+      "description": "Focused requests for the exact Kong gateway cases requested in the assignment brief.",
+      "item": [
+        {
+          "name": "10 Rapid Requests (>5/s) -> 429 Too Many Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{kong_proxy_url}}/books",
+              "host": [
+                "{{kong_proxy_url}}"
+              ],
+              "path": [
+                "books"
+              ]
+            },
+            "description": "Run this request 10 times quickly in Collection Runner or Newman. Kong limits the Book service to 5 requests per second per IP, so the burst should produce at least one `429 Too Many Requests` response."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status is 200 or 429 during burst test', () => {",
+                  "  pm.expect([200, 429]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('429 responses indicate Kong rate limiting', () => {",
+                  "  if (pm.response.code === 429) {",
+                  "    pm.expect(pm.response.text()).to.include('API rate limit exceeded');",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST with 2 MB Body -> 413 Payload Too Large",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('two_mb_blob', 'X'.repeat(2 * 1024 * 1024));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 413', () => pm.response.to.have.status(413));",
+                  "pm.test('Kong size limiting triggered', () => {",
+                  "  pm.expect(pm.response.text().toLowerCase()).to.include('payload');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"{{two_mb_blob}}\",\n  \"author\": \"Gateway Tester\",\n  \"year\": 2024,\n  \"genre\": \"LoadTest\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{kong_proxy_url}}/books",
+              "host": [
+                "{{kong_proxy_url}}"
+              ],
+              "path": [
+                "books"
+              ]
+            },
+            "description": "Sends a request body larger than 2 MiB to a route capped at 1 MB by Kong's `request-size-limiting` plugin. Expected result: `413 Payload Too Large`."
+          },
+          "response": []
+        },
+        {
+          "name": "No Authorization Header -> 401 Unauthorized",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{artist_readonly_apikey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kong_proxy_url}}/v1/artists",
+              "host": [
+                "{{kong_proxy_url}}"
+              ],
+              "path": [
+                "v1",
+                "artists"
+              ]
+            },
+            "description": "Sends the request without the HTTP `Authorization` header. Kong forwards the request to `artist_app.py`, whose Basic auth check should reject it with `401 Unauthorized`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Basic auth challenge is present', () => {",
+                  "  pm.expect(pm.response.headers.get('WWW-Authenticate')).to.include('Basic');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Valid Admin Credentials -> 200 OK (Higher Quota)",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{artist_basic_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{artist_basic_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{artist_admin_apikey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kong_proxy_url}}/v1/artists",
+              "host": [
+                "{{kong_proxy_url}}"
+              ],
+              "path": [
+                "v1",
+                "artists"
+              ]
+            },
+            "description": "Uses the admin consumer key plus valid upstream Basic credentials. Expected result: `200 OK`. This request represents the higher-quota consumer used for the per-consumer override case."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Rate limit header present for higher quota consumer', () => {",
+                  "  pm.expect(pm.response.headers.has('X-RateLimit-Limit-Second')).to.equal(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Per-Consumer Override Burst Check (Admin vs Readonly)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{kong_proxy_url}}/v1/artists",
+              "host": [
+                "{{kong_proxy_url}}"
+              ],
+              "path": [
+                "v1",
+                "artists"
+              ]
+            },
+            "description": "Use Collection Runner twice: first with header `apikey={{artist_readonly_apikey}}` to hit `429` after about 5 requests/second, then with `apikey={{artist_admin_apikey}}` and Basic auth to confirm the admin consumer continues returning `200` under the same burst because it has a higher quota override."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin API",
+      "item": [
+        {
+          "name": "List Kong Services",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{kong_admin_url}}/services",
+              "host": [
+                "{{kong_admin_url}}"
+              ],
+              "path": [
+                "services"
+              ]
+            },
+            "description": "Confirms Kong loaded the declarative config and exposes both upstream services."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Book and artist services exist', () => {",
+                  "  const names = pm.response.json().data.map(s => s.name);",
+                  "  pm.expect(names).to.include('book-service');",
+                  "  pm.expect(names).to.include('artist-service');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Kong Plugins",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{kong_admin_url}}/plugins",
+              "host": [
+                "{{kong_admin_url}}"
+              ],
+              "path": [
+                "plugins"
+              ]
+            },
+            "description": "Checks that rate limiting, request size limiting, and key-auth are active."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Expected plugins are loaded', () => {",
+                  "  const names = pm.response.json().data.map(p => p.name);",
+                  "  pm.expect(names).to.include('rate-limiting');",
+                  "  pm.expect(names).to.include('request-size-limiting');",
+                  "  pm.expect(names).to.include('key-auth');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Book Service via Kong",
+      "item": [
+        {
+          "name": "List Books Through Kong",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{kong_proxy_url}}/books",
+              "host": [
+                "{{kong_proxy_url}}"
+              ],
+              "path": [
+                "books"
+              ]
+            },
+            "description": "Normal proxied request to `app.py`. Kong should add `X-RateLimit-*` headers because IP-based rate limiting is enabled."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Rate limit headers exist', () => {",
+                  "  pm.expect(pm.response.headers.has('X-RateLimit-Limit-Second')).to.equal(true);",
+                  "  pm.expect(pm.response.headers.has('X-RateLimit-Remaining-Second')).to.equal(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Book Through Kong",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Kong Book {{$timestamp}}\",\n  \"author\": \"Gateway Tester\",\n  \"year\": 2024,\n  \"genre\": \"Testing\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{kong_proxy_url}}/books",
+              "host": [
+                "{{kong_proxy_url}}"
+              ],
+              "path": [
+                "books"
+              ]
+            },
+            "description": "Valid POST body below 1 MB. Should be proxied to `app.py` and return `201 Created`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Book - Oversized Payload",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('huge_title', 'X'.repeat(1100000));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 413', () => pm.response.to.have.status(413));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"{{huge_title}}\",\n  \"author\": \"Gateway Tester\",\n  \"year\": 2024,\n  \"genre\": \"Testing\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{kong_proxy_url}}/books",
+              "host": [
+                "{{kong_proxy_url}}"
+              ],
+              "path": [
+                "books"
+              ]
+            },
+            "description": "Generates a request body above 1 MB and verifies Kong blocks it before the upstream sees it."
+          },
+          "response": []
+        },
+        {
+          "name": "GraphQL Through Kong",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"query { books { id title author } }\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{kong_proxy_url}}/graphql",
+              "host": [
+                "{{kong_proxy_url}}"
+              ],
+              "path": [
+                "graphql"
+              ]
+            },
+            "description": "Confirms Kong also proxies the GraphQL route exposed by `app.py`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('GraphQL data returned', () => {",
+                  "  pm.expect(pm.response.json()).to.have.property('data');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Burst Test - Book IP Limit",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{kong_proxy_url}}/books",
+              "host": [
+                "{{kong_proxy_url}}"
+              ],
+              "path": [
+                "books"
+              ]
+            },
+            "description": "Run this request 6+ times quickly in Collection Runner. The first few requests should return `200`, then Kong should return `429 Too Many Requests` because the Book service is limited to 5 req/sec per IP."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Artist Service via Kong",
+      "item": [
+        {
+          "name": "List Artists - Readonly Consumer",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{artist_basic_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{artist_basic_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{artist_readonly_apikey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kong_proxy_url}}/v1/artists",
+              "host": [
+                "{{kong_proxy_url}}"
+              ],
+              "path": [
+                "v1",
+                "artists"
+              ]
+            },
+            "description": "Successful request through Kong using consumer authentication (`apikey`) and upstream HTTP Basic auth for `artist_app.py`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Rate limit headers exist', () => {",
+                  "  pm.expect(pm.response.headers.has('X-RateLimit-Limit-Second')).to.equal(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Artists - Missing Upstream Basic Auth",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{artist_readonly_apikey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kong_proxy_url}}/v1/artists",
+              "host": [
+                "{{kong_proxy_url}}"
+              ],
+              "path": [
+                "v1",
+                "artists"
+              ]
+            },
+            "description": "Kong accepts the consumer key, but the upstream `artist_app.py` should reject the request with `401 Unauthorized` because HTTP Basic auth is missing."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Artist - Admin Consumer",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{artist_basic_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{artist_basic_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{artist_admin_apikey}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kong Artist {{$timestamp}}\",\n  \"genre\": \"Fusion\",\n  \"albumsPublished\": 1,\n  \"username\": \"kong_artist_{{$timestamp}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{kong_proxy_url}}/v1/artists",
+              "host": [
+                "{{kong_proxy_url}}"
+              ],
+              "path": [
+                "v1",
+                "artists"
+              ]
+            },
+            "description": "Creates an artist through Kong using the higher-quota admin consumer."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Burst Test - Readonly Consumer Limit",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{artist_basic_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{artist_basic_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{artist_readonly_apikey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kong_proxy_url}}/v1/artists",
+              "host": [
+                "{{kong_proxy_url}}"
+              ],
+              "path": [
+                "v1",
+                "artists"
+              ]
+            },
+            "description": "Run this request 6+ times quickly in Collection Runner. Kong should start returning `429` after the fifth request because the default consumer quota on the Artist service is 5 req/sec."
+          },
+          "response": []
+        },
+        {
+          "name": "Burst Test - Admin Consumer Override",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{artist_basic_user}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{artist_basic_pass}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "apikey",
+                "value": "{{artist_admin_apikey}}"
+              }
+            ],
+            "url": {
+              "raw": "{{kong_proxy_url}}/v1/artists",
+              "host": [
+                "{{kong_proxy_url}}"
+              ],
+              "path": [
+                "v1",
+                "artists"
+              ]
+            },
+            "description": "Run this request 10 times quickly in Collection Runner. The admin consumer has an override of 20 req/sec, so it should keep returning `200` under the same burst where the readonly consumer starts failing."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

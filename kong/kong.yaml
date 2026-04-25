@@ -1,0 +1,92 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  - name: book-service
+    url: http://host.docker.internal:8000
+    routes:
+      - name: book-rest
+        paths:
+          - /books
+        strip_path: false
+      - name: book-rpc
+        paths:
+          - /rpc
+        strip_path: false
+      - name: book-graphql
+        paths:
+          - /graphql
+        strip_path: false
+
+  - name: artist-service
+    url: http://host.docker.internal:8001
+    routes:
+      - name: artist-api
+        paths:
+          - /v1/artists
+        strip_path: false
+
+consumers:
+  - username: artist-admin-client
+    keyauth_credentials:
+      - key: artist-admin-key
+
+  - username: artist-readonly-client
+    keyauth_credentials:
+      - key: artist-readonly-key
+
+plugins:
+  - name: rate-limiting
+    service: book-service
+    config:
+      second: 5
+      minute: 100
+      hour: 1000
+      policy: local
+      fault_tolerant: true
+      hide_client_headers: false
+      limit_by: ip
+
+  - name: request-size-limiting
+    service: book-service
+    config:
+      allowed_payload_size: 1
+      size_unit: megabytes
+      require_content_length: false
+
+  - name: key-auth
+    service: artist-service
+    config:
+      key_names:
+        - apikey
+      hide_credentials: false
+
+  - name: rate-limiting
+    service: artist-service
+    config:
+      second: 5
+      minute: 100
+      hour: 1000
+      policy: local
+      fault_tolerant: true
+      hide_client_headers: false
+      limit_by: consumer
+
+  - name: request-size-limiting
+    service: artist-service
+    config:
+      allowed_payload_size: 1
+      size_unit: megabytes
+      require_content_length: false
+
+  - name: rate-limiting
+    consumer: artist-admin-client
+    config:
+      second: 20
+      minute: 400
+      hour: 4000
+      policy: local
+      fault_tolerant: true
+      hide_client_headers: false
+      limit_by: consumer
+
