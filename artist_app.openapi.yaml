@@ -1,0 +1,352 @@
+openapi: 3.1.0
+info:
+  title: Record Label Artists API
+  description: API for managing artists of a record label. Provides operations to
+    list, create, and retrieve artists. Secured with **HTTP Basic authentication**.
+  version: 1.0.0
+servers:
+- url: http://localhost:8001
+  description: Local development server
+- url: https://api.recordlabel.example.com/v1
+  description: Production server
+paths:
+  /v1/artists:
+    get:
+      tags:
+      - Artists
+      summary: List artists
+      description: Returns a **paginated** list of artists. Control pagination with
+        `offset` (zero-based start index) and `limit` (page size, 1–100).
+      operationId: listArtists
+      security:
+      - HTTPBasic: []
+      parameters:
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          description: Zero-based index of the first artist to return.
+          default: 0
+          title: Offset
+        description: Zero-based index of the first artist to return.
+        example: 0
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 100
+          minimum: 1
+          description: Maximum number of artists to return (1–100).
+          default: 20
+          title: Limit
+        description: Maximum number of artists to return (1–100).
+        example: 20
+      responses:
+        '200':
+          description: Successful retrieval of artists list.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtistsPage'
+        '400':
+          description: Invalid query parameters (e.g., negative offset, invalid limit).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid authentication credentials.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - Artists
+      summary: Create an artist
+      description: Adds a **new artist** to the record label's database.
+      operationId: createArtist
+      security:
+      - HTTPBasic: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewArtist'
+      responses:
+        '201':
+          description: Artist successfully created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Artist'
+        '400':
+          description: Validation error in the provided artist data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Artist with the same name or username already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid authentication credentials.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/artists/{artistName}:
+    get:
+      tags:
+      - Artists
+      summary: Get artist by name
+      description: Returns a **specific artist's** information identified by their
+        name.
+      operationId: getArtistByName
+      security:
+      - HTTPBasic: []
+      parameters:
+      - name: artistName
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Artistname
+      responses:
+        '200':
+          description: Artist found and returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Artist'
+        '404':
+          description: No artist found with the provided name.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Missing or invalid authentication credentials.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Unexpected server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+components:
+  schemas:
+    Artist:
+      properties:
+        name:
+          type: string
+          title: Name
+          description: Full name of the artist.
+          examples:
+          - The Example Band
+        genre:
+          type: string
+          title: Genre
+          description: Primary musical genre of the artist.
+          examples:
+          - Rock
+        albumsPublished:
+          type: integer
+          minimum: 0.0
+          title: Albumspublished
+          description: Number of albums the artist has released under the label.
+          examples:
+          - 5
+        username:
+          type: string
+          title: Username
+          description: Unique username for the artist within the label system.
+          examples:
+          - example_band
+      type: object
+      required:
+      - name
+      - genre
+      - albumsPublished
+      - username
+      title: Artist
+      description: 'Schema: Artist
+
+        Full representation of an artist stored in the label''s database.'
+      example:
+        albumsPublished: 5
+        genre: Rock
+        name: The Example Band
+        username: example_band
+    ArtistsPage:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Artist'
+          type: array
+          title: Items
+          description: List of artists for the current page.
+        offset:
+          type: integer
+          title: Offset
+          description: Zero-based index of the first item in this page.
+          examples:
+          - 0
+        limit:
+          type: integer
+          title: Limit
+          description: Maximum number of items returned in this page.
+          examples:
+          - 20
+        total:
+          type: integer
+          title: Total
+          description: Total number of artists available.
+          examples:
+          - 125
+      type: object
+      required:
+      - items
+      - offset
+      - limit
+      - total
+      title: ArtistsPage
+      description: 'Schema: ArtistsPage
+
+        Paginated response returned by GET /artists.'
+    Error:
+      properties:
+        code:
+          type: string
+          title: Code
+          description: Application-specific error code.
+          examples:
+          - INVALID_PARAMETER
+        message:
+          type: string
+          title: Message
+          description: Human-readable error message.
+          examples:
+          - The provided limit parameter is invalid.
+        details:
+          anyOf:
+          - type: object
+          - type: 'null'
+          title: Details
+          description: Optional additional error details.
+      type: object
+      required:
+      - code
+      - message
+      title: Error
+      description: 'Schema: Error
+
+        Generic error envelope returned on 4xx / 5xx responses.'
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    NewArtist:
+      properties:
+        name:
+          type: string
+          title: Name
+          description: Full name of the artist.
+        genre:
+          type: string
+          title: Genre
+          description: Primary musical genre of the artist.
+        albumsPublished:
+          type: integer
+          minimum: 0.0
+          title: Albumspublished
+          description: Number of albums the artist has released under the label.
+        username:
+          type: string
+          title: Username
+          description: Unique username for the artist within the label system.
+      type: object
+      required:
+      - name
+      - genre
+      - albumsPublished
+      - username
+      title: NewArtist
+      description: 'Schema: NewArtist
+
+        Payload required when creating a new artist via POST /artists.'
+      example:
+        albumsPublished: 3
+        genre: Jazz
+        name: Solar Groove
+        username: solar_groove
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+  securitySchemes:
+    HTTPBasic:
+      type: http
+      scheme: basic
