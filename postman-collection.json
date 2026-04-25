@@ -1,0 +1,1178 @@
+{
+  "info": {
+    "name": "Book Info Service — REST, RPC & GraphQL",
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "description": "Complete Postman collection for the Book Info Service demonstrating three API paradigms:\n\n**REST** — Resource-oriented, HTTP verbs, standard status codes (`/books`)\n\n**RPC** — Action-oriented, all POST, response envelope (`/rpc/*`)\n\n**GraphQL** — Single endpoint, client-driven field selection (`/graphql`)\n\n---\n**Base URL:** `http://localhost:8000`\n\nRun the server first:\n```\npip install -r requirements.txt\nuvicorn app:app --reload --port 8000\n```",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string",
+      "description": "Base URL of the running FastAPI server"
+    },
+    {
+      "key": "book_id",
+      "value": "1",
+      "type": "string",
+      "description": "Default book ID used in parameterised requests"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health & Info",
+      "item": [
+        {
+          "name": "Service Root",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
+            },
+            "description": "Returns service metadata and a full map of every endpoint across all three paradigms."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has paradigms key', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('paradigms');",
+                  "    pm.expect(json.paradigms).to.have.all.keys('REST','RPC','GraphQL');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "REST — /books",
+      "description": "Resource-oriented endpoints. HTTP verbs express intent; status codes communicate outcome.\n\n| Method | Path | Purpose |\n|---|---|---|\n| GET | /books | List all (filterable) |\n| GET | /books/{id} | Single book |\n| POST | /books | Create |\n| PUT | /books/{id} | Update |\n| DELETE | /books/{id} | Delete |",
+      "item": [
+        {
+          "name": "List All Books",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/books",
+              "host": ["{{base_url}}"],
+              "path": ["books"]
+            },
+            "description": "Returns all books in the catalogue. Expects HTTP 200 and a JSON array."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response is array', () => {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "pm.test('Books have required fields', () => {",
+                  "    const books = pm.response.json();",
+                  "    if (books.length > 0) {",
+                  "        pm.expect(books[0]).to.have.all.keys('id','title','author','year','genre');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Books — Filter by Genre",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/books?genre=Programming",
+              "host": ["{{base_url}}"],
+              "path": ["books"],
+              "query": [
+                {
+                  "key": "genre",
+                  "value": "Programming",
+                  "description": "Case-insensitive genre filter"
+                }
+              ]
+            },
+            "description": "Filters the book list by genre. Change the `genre` query param to try others (e.g. `Software Engineering`, `Computer Science`)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All results match genre', () => {",
+                  "    pm.response.json().forEach(b => {",
+                  "        pm.expect(b.genre.toLowerCase()).to.equal('programming');",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Book by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/books/{{book_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["books", "{{book_id}}"]
+            },
+            "description": "Retrieves a single book by its numeric ID. Change the `book_id` collection variable to test different IDs."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Correct ID returned', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.id).to.equal(Number(pm.collectionVariables.get('book_id')));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Book by ID — 404 Not Found",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/books/9999",
+              "host": ["{{base_url}}"],
+              "path": ["books", "9999"]
+            },
+            "description": "Requests a book ID that does not exist. Expects HTTP 404 with a `detail` error message."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Error detail present', () => {",
+                  "    pm.expect(pm.response.json()).to.have.property('detail');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Book",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Structure and Interpretation of Computer Programs\",\n  \"author\": \"Harold Abelson & Gerald Jay Sussman\",\n  \"year\": 1996,\n  \"genre\": \"Programming\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/books",
+              "host": ["{{base_url}}"],
+              "path": ["books"]
+            },
+            "description": "Creates a new book. Expects HTTP 201 Created. The server assigns the `id`. Run once — subsequent runs return 409 because the title already exists."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('ID assigned by server', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.id).to.be.a('number');",
+                  "    // save for later requests",
+                  "    pm.collectionVariables.set('book_id', json.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Book — 409 Duplicate Title",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Clean Code\",\n  \"author\": \"Someone Else\",\n  \"year\": 2024,\n  \"genre\": \"Programming\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/books",
+              "host": ["{{base_url}}"],
+              "path": ["books"]
+            },
+            "description": "Attempts to create a book with a title that already exists. Expects HTTP 409 Conflict."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Conflict detail present', () => {",
+                  "    pm.expect(pm.response.json()).to.have.property('detail');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Book",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Clean Code (2nd Edition)\",\n  \"author\": \"Robert C. Martin\",\n  \"year\": 2024,\n  \"genre\": \"Programming\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/books/1",
+              "host": ["{{base_url}}"],
+              "path": ["books", "1"]
+            },
+            "description": "Fully replaces a book's fields. Expects HTTP 200 with the updated resource."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Title updated', () => {",
+                  "    pm.expect(pm.response.json().title).to.include('2nd Edition');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Book",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/books/5",
+              "host": ["{{base_url}}"],
+              "path": ["books", "5"]
+            },
+            "description": "Deletes book with ID 5. Expects HTTP 204 No Content with an empty body."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', () => pm.response.to.have.status(204));",
+                  "pm.test('Body is empty', () => {",
+                  "    pm.expect(pm.response.text()).to.equal('');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Book — 404 Not Found",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/books/9999",
+              "host": ["{{base_url}}"],
+              "path": ["books", "9999"]
+            },
+            "description": "Attempts to delete a non-existent book. Expects HTTP 404."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RPC — /rpc/*",
+      "description": "Action-oriented endpoints — every call uses **POST**. The operation name is in the URL path. HTTP status is always **200**; check the `success` boolean in the envelope for the outcome.\n\n```json\n// Success envelope\n{\"success\": true,  \"data\": {...}, \"error\": null}\n\n// Failure envelope (still HTTP 200)\n{\"success\": false, \"data\": null, \"error\": \"...\"}\n```",
+      "item": [
+        {
+          "name": "listBooks",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/rpc/listBooks",
+              "host": ["{{base_url}}"],
+              "path": ["rpc", "listBooks"]
+            },
+            "description": "RPC call to list all books. No body required (or pass `{}`)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Envelope success=true', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "getBook — Found",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 2\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/rpc/getBook",
+              "host": ["{{base_url}}"],
+              "path": ["rpc", "getBook"]
+            },
+            "description": "RPC call to fetch book id=2. Returns `success:true` with the book object."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('success=true and data present', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data).to.have.property('id', 2);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "getBook — Not Found",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 9999\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/rpc/getBook",
+              "host": ["{{base_url}}"],
+              "path": ["rpc", "getBook"]
+            },
+            "description": "RPC call for a non-existent ID. HTTP status is still 200 but `success` is false and `error` is set — this is the key RPC difference from REST."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200 (RPC always 200)', () => pm.response.to.have.status(200));",
+                  "pm.test('success=false with error message', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.error).to.be.a('string').and.not.empty;",
+                  "    pm.expect(json.data).to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "createBook",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"You Don't Know JS\",\n  \"author\": \"Kyle Simpson\",\n  \"year\": 2015,\n  \"genre\": \"Programming\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/rpc/createBook",
+              "host": ["{{base_url}}"],
+              "path": ["rpc", "createBook"]
+            },
+            "description": "RPC call to create a new book. HTTP status is always 200; the new book is inside `data`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Book created successfully', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.id).to.be.a('number');",
+                  "    pm.expect(json.data.title).to.equal(\"You Don't Know JS\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "createBook — Duplicate Title",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Clean Code\",\n  \"author\": \"Copycat Author\",\n  \"year\": 2024,\n  \"genre\": \"Programming\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/rpc/createBook",
+              "host": ["{{base_url}}"],
+              "path": ["rpc", "createBook"]
+            },
+            "description": "Demonstrates RPC error handling — duplicate title returns HTTP 200 with `success:false`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('success=false for duplicate', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.error).to.include('already exists');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "deleteBook",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 4\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/rpc/deleteBook",
+              "host": ["{{base_url}}"],
+              "path": ["rpc", "deleteBook"]
+            },
+            "description": "RPC call to delete book id=4. Returns `{success:true, data:{deleted_id:4}}`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('success=true', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data.deleted_id).to.equal(4);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "deleteBook — Not Found",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 9999\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/rpc/deleteBook",
+              "host": ["{{base_url}}"],
+              "path": ["rpc", "deleteBook"]
+            },
+            "description": "Attempts to delete a book that does not exist. Returns HTTP 200 with `success:false`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('success=false', () => {",
+                  "    pm.expect(pm.response.json().success).to.be.false;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "GraphQL — /graphql",
+      "description": "All GraphQL operations go through the single `/graphql` endpoint.\n\n- **Queries** → read operations (equivalent to GET in REST)\n- **Mutations** → write operations (equivalent to POST/PUT/DELETE in REST)\n- Clients choose **exactly which fields** to return — no over-fetching.\n\nOpen `http://localhost:8000/graphql` in a browser for the interactive **GraphiQL IDE**.",
+      "item": [
+        {
+          "name": "Query — Get Book by ID (all fields)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"{ book(id: 1) { id title author year genre } }\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/graphql",
+              "host": ["{{base_url}}"],
+              "path": ["graphql"]
+            },
+            "description": "Fetches book with `id=1` requesting all five fields. Change the ID in the query string to fetch other books."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('data.book exists', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('data');",
+                  "    pm.expect(json.data.book).to.have.all.keys('id','title','author','year','genre');",
+                  "});",
+                  "pm.test('No GraphQL errors', () => {",
+                  "    pm.expect(pm.response.json()).to.not.have.property('errors');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Query — Partial Fields (title + author only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"{ book(id: 2) { title author } }\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/graphql",
+              "host": ["{{base_url}}"],
+              "path": ["graphql"]
+            },
+            "description": "Demonstrates GraphQL's **no over-fetching** principle — the server only returns `title` and `author`; `id`, `year`, and `genre` are not transmitted."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Only requested fields returned', () => {",
+                  "    const book = pm.response.json().data.book;",
+                  "    pm.expect(book).to.have.all.keys('title', 'author');",
+                  "    pm.expect(book).to.not.have.property('id');",
+                  "    pm.expect(book).to.not.have.property('year');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Query — List All Books",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"{ books { id title author year genre } }\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/graphql",
+              "host": ["{{base_url}}"],
+              "path": ["graphql"]
+            },
+            "description": "Lists all books via GraphQL query."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('data.books is array', () => {",
+                  "    pm.expect(pm.response.json().data.books).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Query — Filter Books by Genre",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"{ books(genre: \\\"Programming\\\") { id title author } }\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/graphql",
+              "host": ["{{base_url}}"],
+              "path": ["graphql"]
+            },
+            "description": "Filters books by genre using a GraphQL argument. Change `Programming` to `Software Engineering` or `Computer Science` to test other genres."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('All results are Programming genre', () => {",
+                  "    pm.response.json().data.books.forEach(b => {",
+                  "        pm.expect(b).to.not.have.property('genre'); // not requested",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Query — Book Count",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"{ bookCount }\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/graphql",
+              "host": ["{{base_url}}"],
+              "path": ["graphql"]
+            },
+            "description": "Returns the total number of books in the catalogue."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('bookCount is a number', () => {",
+                  "    pm.expect(pm.response.json().data.bookCount).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Query — Book Count by Genre",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"{ bookCount(genre: \\\"Programming\\\") }\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/graphql",
+              "host": ["{{base_url}}"],
+              "path": ["graphql"]
+            },
+            "description": "Counts books in a specific genre."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Count is a number', () => {",
+                  "    pm.expect(pm.response.json().data.bookCount).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Query — Book Not Found (null response)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"{ book(id: 9999) { title author } }\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/graphql",
+              "host": ["{{base_url}}"],
+              "path": ["graphql"]
+            },
+            "description": "Queries a non-existent book. GraphQL returns `{data: {book: null}}` — no `errors` array because the field is nullable. This differs from REST (404) and RPC (`success:false`)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('book is null (not an error)', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.data.book).to.be.null;",
+                  "    pm.expect(json).to.not.have.property('errors');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mutation — Create Book",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation { createBook(title: \\\"Domain-Driven Design\\\", author: \\\"Eric Evans\\\", year: 2003, genre: \\\"Software Engineering\\\") { id title author year genre } }\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/graphql",
+              "host": ["{{base_url}}"],
+              "path": ["graphql"]
+            },
+            "description": "GraphQL mutation to create a new book. The server assigns the `id`; the mutation returns whichever fields are requested."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Book created in data', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.not.have.property('errors');",
+                  "    pm.expect(json.data.createBook.id).to.be.a('number');",
+                  "    pm.expect(json.data.createBook.title).to.equal('Domain-Driven Design');",
+                  "    // Save ID for later",
+                  "    pm.collectionVariables.set('graphql_created_id', json.data.createBook.id);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mutation — Create Book Duplicate (Error)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation { createBook(title: \\\"Clean Code\\\", author: \\\"Someone\\\", year: 2024, genre: \\\"Programming\\\") { id title } }\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/graphql",
+              "host": ["{{base_url}}"],
+              "path": ["graphql"]
+            },
+            "description": "Attempts to create a duplicate title. GraphQL returns HTTP 200 but with an `errors` array — note how this differs from REST (409) and RPC (`success:false`)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('GraphQL errors array populated', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('errors');",
+                  "    pm.expect(json.errors).to.be.an('array').with.length.greaterThan(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mutation — Update Book",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation { updateBook(id: 1, title: \\\"Clean Code — Revised\\\", author: \\\"Robert C. Martin\\\", year: 2024, genre: \\\"Programming\\\") { id title year } }\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/graphql",
+              "host": ["{{base_url}}"],
+              "path": ["graphql"]
+            },
+            "description": "GraphQL mutation to update an existing book. All fields must be supplied (full replacement)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Book updated', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.not.have.property('errors');",
+                  "    pm.expect(json.data.updateBook.year).to.equal(2024);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mutation — Delete Book",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation { deleteBook(id: 3) { success deletedId message } }\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/graphql",
+              "host": ["{{base_url}}"],
+              "path": ["graphql"]
+            },
+            "description": "Deletes book with id=3. Returns a `DeleteResult` object with `success`, `deletedId`, and `message`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Delete succeeded', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.not.have.property('errors');",
+                  "    pm.expect(json.data.deleteBook.success).to.be.true;",
+                  "    pm.expect(json.data.deleteBook.deletedId).to.equal(3);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mutation — Delete Book Not Found",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"mutation { deleteBook(id: 9999) { success deletedId message } }\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/graphql",
+              "host": ["{{base_url}}"],
+              "path": ["graphql"]
+            },
+            "description": "Attempts to delete a non-existent book. Returns `{success: false}` inside `data.deleteBook` rather than an `errors` array — the mutation handles this gracefully."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('success=false, no crash', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.data.deleteBook.success).to.be.false;",
+                  "    pm.expect(json.data.deleteBook.deletedId).to.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Introspection — List All Types",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"{ __schema { types { name kind } } }\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/graphql",
+              "host": ["{{base_url}}"],
+              "path": ["graphql"]
+            },
+            "description": "GraphQL **introspection** query — a capability unique to GraphQL. Clients can discover the entire schema without external documentation. There is no REST or RPC equivalent built into the protocol."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Schema types returned', () => {",
+                  "    const types = pm.response.json().data.__schema.types;",
+                  "    pm.expect(types).to.be.an('array');",
+                  "    const names = types.map(t => t.name);",
+                  "    pm.expect(names).to.include('BookType');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Introspection — Query Fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"{ __type(name: \\\"Query\\\") { name fields { name description args { name type { name } } } } }\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/graphql",
+              "host": ["{{base_url}}"],
+              "path": ["graphql"]
+            },
+            "description": "Introspects the `Query` type to list all available queries, their arguments, and descriptions — self-documenting API."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Query fields discovered', () => {",
+                  "    const fields = pm.response.json().data.__type.fields;",
+                  "    const fieldNames = fields.map(f => f.name);",
+                  "    pm.expect(fieldNames).to.include.members(['book','books','bookCount']);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
