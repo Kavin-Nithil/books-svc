@@ -1,0 +1,879 @@
+{
+  "info": {
+    "name": "Record Label Artists API",
+    "_postman_id": "rl-artists-api-8001",
+    "description": "Complete Postman collection for the Record Label Artists API running on port 8001.\n\n**Base URL:** `http://localhost:8001`\n\n**Authentication:** HTTP Basic Auth on every request.\n\n| Username | Password |\n|---|---|\n| `admin` | `secret123` |\n| `readonly` | `readpass` |\n\n**Endpoints:**\n- `GET  /v1/artists`              — Paginated list of artists\n- `POST /v1/artists`              — Create a new artist\n- `GET  /v1/artists/{artistName}` — Get artist by name\n\n**Run the server first:**\n```\nuvicorn app:app --reload --port 8001\n```",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8001",
+      "type": "string",
+      "description": "Base URL — change to your server address if needed"
+    },
+    {
+      "key": "username",
+      "value": "admin",
+      "type": "string",
+      "description": "Basic Auth username"
+    },
+    {
+      "key": "password",
+      "value": "secret123",
+      "type": "string",
+      "description": "Basic Auth password"
+    },
+    {
+      "key": "artist_name",
+      "value": "Arctic Beats",
+      "type": "string",
+      "description": "Artist name used in GET /v1/artists/{artistName}"
+    }
+  ],
+  "auth": {
+    "type": "basic",
+    "basic": [
+      { "key": "username", "value": "{{username}}", "type": "string" },
+      { "key": "password", "value": "{{password}}", "type": "string" }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Unauthenticated health check. Returns server status and total artist count."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status is ok', () => {",
+                  "    pm.expect(pm.response.json().status).to.equal('ok');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "GET /v1/artists — List Artists",
+      "description": "Paginated list of all artists. Requires Basic Auth.\n\nQuery params:\n- `offset` — zero-based start index (default 0, min 0)\n- `limit`  — page size (default 20, range 1–100)",
+      "item": [
+        {
+          "name": "List Artists — Default Pagination",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/artists",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists"]
+            },
+            "description": "Returns the first page of artists using default pagination (offset=0, limit=20)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has pagination fields', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.all.keys('items', 'offset', 'limit', 'total');",
+                  "});",
+                  "pm.test('items is an array', () => {",
+                  "    pm.expect(pm.response.json().items).to.be.an('array');",
+                  "});",
+                  "pm.test('Each artist has required fields', () => {",
+                  "    const items = pm.response.json().items;",
+                  "    if (items.length > 0) {",
+                  "        pm.expect(items[0]).to.have.all.keys('name', 'genre', 'albumsPublished', 'username');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Artists — Custom Offset & Limit",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/artists?offset=2&limit=3",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists"],
+              "query": [
+                { "key": "offset", "value": "2", "description": "Skip first 2 artists" },
+                { "key": "limit",  "value": "3", "description": "Return at most 3 artists" }
+              ]
+            },
+            "description": "Fetches artists with offset=2 and limit=3 — demonstrates pagination control."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Offset and limit echoed correctly', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.offset).to.equal(2);",
+                  "    pm.expect(json.limit).to.equal(3);",
+                  "});",
+                  "pm.test('Items count respects limit', () => {",
+                  "    pm.expect(pm.response.json().items.length).to.be.at.most(3);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Artists — Page 2 (offset=5, limit=5)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/artists?offset=5&limit=5",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists"],
+              "query": [
+                { "key": "offset", "value": "5" },
+                { "key": "limit",  "value": "5" }
+              ]
+            },
+            "description": "Second page of 5 artists. Shows total field to calculate total pages."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Total reflects full dataset size', () => {",
+                  "    pm.expect(pm.response.json().total).to.be.a('number').and.greaterThan(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Artists — Max Limit (100)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/artists?limit=100",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists"],
+              "query": [
+                { "key": "limit", "value": "100", "description": "Maximum allowed limit" }
+              ]
+            },
+            "description": "Tests the maximum allowed limit of 100. Should return 200."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('limit is 100', () => {",
+                  "    pm.expect(pm.response.json().limit).to.equal(100);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Artists — 401 No Credentials",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/artists",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists"]
+            },
+            "description": "Sends the request without any Authorization header. Expects 401 Unauthorized."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('WWW-Authenticate header present', () => {",
+                  "    pm.expect(pm.response.headers.get('WWW-Authenticate')).to.include('Basic');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Artists — 401 Wrong Password",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                { "key": "username", "value": "admin",      "type": "string" },
+                { "key": "password", "value": "wrongpass",  "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/artists",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists"]
+            },
+            "description": "Sends a valid username but an incorrect password. Expects 401."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Artists — 422 Invalid Limit (limit=0)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/artists?limit=0",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists"],
+              "query": [
+                { "key": "limit", "value": "0", "description": "Below minimum of 1" }
+              ]
+            },
+            "description": "limit=0 violates the minimum constraint (ge=1). FastAPI returns 422 Unprocessable Entity."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Artists — 422 Invalid Limit (limit=200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/artists?limit=200",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists"],
+              "query": [
+                { "key": "limit", "value": "200", "description": "Above maximum of 100" }
+              ]
+            },
+            "description": "limit=200 exceeds the maximum constraint (le=100). FastAPI returns 422."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Artists — 422 Negative Offset",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/artists?offset=-1",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists"],
+              "query": [
+                { "key": "offset", "value": "-1", "description": "Negative offset not allowed" }
+              ]
+            },
+            "description": "offset=-1 violates the minimum constraint (ge=0). FastAPI returns 422."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "POST /v1/artists — Create Artist",
+      "description": "Creates a new artist record. Both `name` and `username` must be unique.\n\nReturns **201 Created** on success, **409 Conflict** for duplicates, **422** for missing/invalid fields.",
+      "item": [
+        {
+          "name": "Create Artist — Success (201)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Crystal Wave\",\n  \"genre\": \"Synthwave\",\n  \"albumsPublished\": 2,\n  \"username\": \"crystal_wave\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/artists",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists"]
+            },
+            "description": "Creates a brand new artist. Run once — a second run returns 409 because the name/username already exists.\n\nOn success the response echoes back the saved artist with HTTP 201."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Created artist returned', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.name).to.equal('Crystal Wave');",
+                  "    pm.expect(json.username).to.equal('crystal_wave');",
+                  "    pm.expect(json.albumsPublished).to.equal(2);",
+                  "});",
+                  "pm.test('All required fields present', () => {",
+                  "    pm.expect(pm.response.json()).to.have.all.keys('name','genre','albumsPublished','username');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Artist — Another Valid Artist",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Indigo River\",\n  \"genre\": \"R&B\",\n  \"albumsPublished\": 4,\n  \"username\": \"indigo_river\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/artists",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists"]
+            },
+            "description": "Adds a second new artist to verify the list grows correctly."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Name matches', () => {",
+                  "    pm.expect(pm.response.json().name).to.equal('Indigo River');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Artist — 409 Duplicate Name",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Arctic Beats\",\n  \"genre\": \"Pop\",\n  \"albumsPublished\": 1,\n  \"username\": \"arctic_beats_new\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/artists",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists"]
+            },
+            "description": "Attempts to create an artist with a name that already exists (`Arctic Beats`). Expects **409 Conflict**."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Error code is CONFLICT', () => {",
+                  "    const detail = pm.response.json().detail;",
+                  "    pm.expect(detail.code).to.equal('CONFLICT');",
+                  "    pm.expect(detail.message).to.be.a('string').and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Artist — 409 Duplicate Username",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Totally New Artist\",\n  \"genre\": \"Jazz\",\n  \"albumsPublished\": 0,\n  \"username\": \"solar_groove\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/artists",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists"]
+            },
+            "description": "Unique name but duplicate username (`solar_groove`). Expects **409 Conflict**."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Error references username field', () => {",
+                  "    const detail = pm.response.json().detail;",
+                  "    pm.expect(detail.details.field).to.equal('username');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Artist — 422 Missing Required Field",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ghost Band\",\n  \"genre\": \"Alternative\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/artists",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists"]
+            },
+            "description": "Missing `albumsPublished` and `username`. FastAPI/Pydantic returns **422 Unprocessable Entity** listing the missing fields."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('Validation errors listed', () => {",
+                  "    const detail = pm.response.json().detail;",
+                  "    pm.expect(detail).to.be.an('array').with.length.greaterThan(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Artist — 422 Negative albumsPublished",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Minus Band\",\n  \"genre\": \"Rock\",\n  \"albumsPublished\": -3,\n  \"username\": \"minus_band\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/artists",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists"]
+            },
+            "description": "`albumsPublished` must be >= 0. A negative value returns 422."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Artist — 401 No Credentials",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept",       "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"No Auth Band\",\n  \"genre\": \"Pop\",\n  \"albumsPublished\": 1,\n  \"username\": \"no_auth_band\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/v1/artists",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists"]
+            },
+            "description": "POST without any credentials. Expects **401 Unauthorized**."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "GET /v1/artists/{artistName} — Get Artist by Name",
+      "description": "Retrieves a single artist by their full name (case-insensitive path parameter).\n\n- **200** — Artist found\n- **401** — Missing / invalid credentials\n- **404** — No artist with that name",
+      "item": [
+        {
+          "name": "Get Artist — Arctic Beats (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/artists/Arctic Beats",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists", "Arctic Beats"]
+            },
+            "description": "Retrieves `Arctic Beats` from the seed data. Expects 200 with the full artist object."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Correct artist returned', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.name).to.equal('Arctic Beats');",
+                  "    pm.expect(json).to.have.all.keys('name','genre','albumsPublished','username');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Artist — Solar Groove (200)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/artists/Solar Groove",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists", "Solar Groove"]
+            },
+            "description": "Retrieves `Solar Groove`. Verify genre=Jazz, albumsPublished=7."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Genre is Jazz', () => {",
+                  "    pm.expect(pm.response.json().genre).to.equal('Jazz');",
+                  "});",
+                  "pm.test('albumsPublished is 7', () => {",
+                  "    pm.expect(pm.response.json().albumsPublished).to.equal(7);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Artist — URL-Encoded Name",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/artists/Velvet%20Storm",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists", "Velvet%20Storm"]
+            },
+            "description": "Tests URL-encoded path parameter — `%20` is a space. Should return `Velvet Storm` correctly."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Name is Velvet Storm', () => {",
+                  "    pm.expect(pm.response.json().name).to.equal('Velvet Storm');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Artist — Using Collection Variable",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/artists/{{artist_name}}",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists", "{{artist_name}}"]
+            },
+            "description": "Uses the `artist_name` collection variable (default: `Arctic Beats`). Change the variable value to test different artists."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Name matches collection variable', () => {",
+                  "    const expected = pm.collectionVariables.get('artist_name');",
+                  "    pm.expect(pm.response.json().name.toLowerCase()).to.equal(expected.toLowerCase());",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Artist — 404 Not Found",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/artists/Unknown Artist",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists", "Unknown Artist"]
+            },
+            "description": "Requests an artist name that does not exist. Expects **404 Not Found** with error code `NOT_FOUND`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Error code is NOT_FOUND', () => {",
+                  "    const detail = pm.response.json().detail;",
+                  "    pm.expect(detail.code).to.equal('NOT_FOUND');",
+                  "    pm.expect(detail.message).to.be.a('string').and.not.empty;",
+                  "    pm.expect(detail.details.artistName).to.equal('Unknown Artist');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Artist — 401 No Credentials",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/artists/Arctic Beats",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists", "Arctic Beats"]
+            },
+            "description": "Valid artist name but no credentials. Expects **401 Unauthorized**."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));",
+                  "pm.test('WWW-Authenticate header set', () => {",
+                  "    pm.expect(pm.response.headers.get('WWW-Authenticate')).to.include('Basic');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Artist — 401 Wrong Credentials",
+          "request": {
+            "auth": {
+              "type": "basic",
+              "basic": [
+                { "key": "username", "value": "hacker",     "type": "string" },
+                { "key": "password", "value": "letmein",    "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/v1/artists/Arctic Beats",
+              "host": ["{{base_url}}"],
+              "path": ["v1", "artists", "Arctic Beats"]
+            },
+            "description": "Invalid username and password. Expects **401 Unauthorized**."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
